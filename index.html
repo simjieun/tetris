@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Tetris</title>
+    
+    <!-- 1. 구글 애드센스 자동 광고 스크립트 (본인의 코드로 교체하세요) -->
+    <!-- 
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+     crossorigin="anonymous"></script> 
+    -->
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Orbitron', sans-serif;
+            touch-action: manipulation;
+            overflow-y: auto; /* 광고 표시를 위해 세로 스크롤 허용 */
+        }
+
+        .game-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        #game-board {
+            background: rgba(30, 41, 59, 0.7);
+            border: 4px solid #334155;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: grid;
+            grid-template-rows: repeat(20, 1fr);
+            grid-template-columns: repeat(10, 1fr);
+            gap: 1px;
+        }
+
+        .cell {
+            aspect-ratio: 1/1;
+            border-radius: 2px;
+            transition: background-color 0.1s;
+        }
+
+        .piece-i { background: #06b6d4; box-shadow: inset 0 0 10px #22d3ee; }
+        .piece-j { background: #3b82f6; box-shadow: inset 0 0 10px #60a5fa; }
+        .piece-l { background: #f97316; box-shadow: inset 0 0 10px #fb923c; }
+        .piece-o { background: #eab308; box-shadow: inset 0 0 10px #fde047; }
+        .piece-s { background: #22c55e; box-shadow: inset 0 0 10px #4ade80; }
+        .piece-t { background: #a855f7; box-shadow: inset 0 0 10px #c084fc; }
+        .piece-z { background: #ef4444; box-shadow: inset 0 0 10px #f87171; }
+        
+        .ghost { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+        
+        .control-btn {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .neon-text {
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .overlay {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-blur: 4px;
+        }
+
+        /* 광고 영역 스타일링 */
+        .ad-slot-container {
+            width: 100%;
+            min-height: 90px;
+            background: rgba(30, 41, 59, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            margin-top: 20px;
+            color: #475569;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-start min-h-screen p-4 py-8">
+
+    <div class="game-container w-full flex flex-col gap-4">
+        <!-- Header -->
+        <div class="flex justify-between items-end mb-2">
+            <div>
+                <h1 class="text-3xl font-bold tracking-widest neon-text">TETRIS</h1>
+                <p class="text-xs text-slate-400">CLASSIC ARCADE</p>
+            </div>
+            <div class="text-right">
+                <div class="text-sm text-slate-400">SCORE</div>
+                <div id="score" class="text-2xl font-bold text-cyan-400">000000</div>
+            </div>
+        </div>
+
+        <div class="flex gap-4">
+            <!-- Main Game Board -->
+            <div id="game-board" class="flex-grow aspect-[1/2] relative">
+                <!-- Pause Overlay -->
+                <div id="pause-overlay" class="absolute inset-0 z-10 flex items-center justify-center overlay hidden">
+                    <span class="text-3xl font-bold text-white tracking-widest neon-text">PAUSED</span>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="flex flex-col gap-4 w-24 sm:w-32">
+                <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700">
+                    <div class="text-center text-[10px] text-slate-400 mb-2 font-bold">NEXT</div>
+                    <div id="next-piece" class="grid grid-cols-4 grid-rows-4 gap-1 aspect-square">
+                        <!-- Next piece preview -->
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/50 p-2 rounded-lg border border-slate-700 text-center">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase">Level</div>
+                    <div id="level" class="text-xl text-yellow-400">1</div>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <button id="start-btn" class="bg-cyan-600 hover:bg-cyan-500 py-3 rounded-lg font-bold text-sm transition-colors shadow-lg shadow-cyan-900/20">
+                        START
+                    </button>
+                    <button id="pause-btn" class="bg-slate-700 hover:bg-slate-600 py-3 rounded-lg font-bold text-sm transition-colors border border-slate-600">
+                        PAUSE
+                    </button>
+                </div>
+                
+                <div class="hidden sm:block text-[10px] text-slate-500 mt-auto leading-relaxed">
+                    CONTROLS:<br>
+                    ← → : Move<br>
+                    ↑ : Rotate<br>
+                    ↓ : Soft Drop<br>
+                    Space : Hard Drop<br>
+                    P : Pause
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div class="grid grid-cols-3 gap-2 mt-4 sm:hidden">
+            <div class="flex items-center justify-center">
+                <button id="ctrl-up" class="control-btn w-14 h-14 bg-slate-700 rounded-full flex items-center justify-center text-xl">↻</button>
+            </div>
+            <div class="flex items-center justify-center">
+                <button id="ctrl-hard" class="control-btn w-14 h-14 bg-cyan-700 rounded-full flex items-center justify-center text-xl">⬇</button>
+            </div>
+            <div class="flex items-center justify-center">
+                <button id="ctrl-pause" class="control-btn w-14 h-14 bg-slate-700 rounded-full flex items-center justify-center text-sm font-bold">P</button>
+            </div>
+            <div class="flex justify-center gap-2 col-span-3">
+                <button id="ctrl-left" class="control-btn w-16 h-14 bg-slate-700 rounded-lg flex items-center justify-center text-2xl">←</button>
+                <button id="ctrl-down" class="control-btn w-16 h-14 bg-slate-700 rounded-lg flex items-center justify-center text-2xl">↓</button>
+                <button id="ctrl-right" class="control-btn w-16 h-14 bg-slate-700 rounded-lg flex items-center justify-center text-2xl">→</button>
+            </div>
+        </div>
+
+        <!-- 2. 하단 광고 단위 (본인의 광고 코드로 교체하세요) -->
+        <div class="ad-slot-container">
+            <!-- 
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                 data-ad-slot="XXXXXXXXXX"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+            <script>
+                 (adsbygoogle = window.adsbygoogle || []).push({});
+            </script> 
+            -->
+            ADVERTISING SPACE
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="game-over" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center hidden z-50">
+        <div class="bg-slate-800 p-8 rounded-2xl border-2 border-slate-700 text-center shadow-2xl">
+            <h2 class="text-4xl font-bold text-red-500 mb-2">GAME OVER</h2>
+            <p id="final-score" class="text-xl text-slate-300 mb-6">Score: 0</p>
+            <button onclick="location.reload()" class="bg-cyan-600 hover:bg-cyan-500 px-8 py-3 rounded-full font-bold transition-all">TRY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+        const SHAPES = {
+            'I': [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]],
+            'J': [[1, 0, 0], [1, 1, 1], [0, 0, 0]],
+            'L': [[0, 0, 1], [1, 1, 1], [0, 0, 0]],
+            'O': [[1, 1], [1, 1]],
+            'S': [[0, 1, 1], [1, 1, 0], [0, 0, 0]],
+            'T': [[0, 1, 0], [1, 1, 1], [0, 0, 0]],
+            'Z': [[1, 1, 0], [0, 1, 1], [0, 0, 0]]
+        };
+        const COLORS = {
+            'I': 'piece-i', 'J': 'piece-j', 'L': 'piece-l',
+            'O': 'piece-o', 'S': 'piece-s', 'T': 'piece-t', 'Z': 'piece-z'
+        };
+
+        let board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+        let score = 0;
+        let level = 1;
+        let gameActive = false;
+        let isPaused = false;
+        let currentPiece = null;
+        let nextPiece = null;
+        let dropCounter = 0;
+        let dropInterval = 1000;
+        let lastTime = 0;
+
+        const boardElement = document.getElementById('game-board');
+        const nextElement = document.getElementById('next-piece');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const pauseOverlay = document.getElementById('pause-overlay');
+        const gameOverModal = document.getElementById('game-over');
+
+        // Create Board DOM
+        function createBoard() {
+            boardElement.innerHTML = '<div id="pause-overlay" class="absolute inset-0 z-10 flex items-center justify-center overlay hidden"><span class="text-3xl font-bold text-white tracking-widest neon-text">PAUSED</span></div>';
+            for (let y = 0; y < BOARD_HEIGHT; y++) {
+                for (let x = 0; x < BOARD_WIDTH; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${y}-${x}`;
+                    boardElement.appendChild(cell);
+                }
+            }
+            
+            nextElement.innerHTML = '';
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell opacity-20 bg-slate-700';
+                nextElement.appendChild(cell);
+            }
+        }
+
+        function createPiece(type) {
+            const shape = SHAPES[type];
+            return {
+                type,
+                shape,
+                pos: { x: Math.floor(BOARD_WIDTH / 2) - Math.floor(shape[0].length / 2), y: 0 }
+            };
+        }
+
+        function draw() {
+            const cells = document.querySelectorAll('#game-board .cell');
+            cells.forEach(cell => { cell.className = 'cell'; });
+
+            board.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const cell = document.getElementById(`cell-${y}-${x}`);
+                        if (cell) cell.classList.add(COLORS[value]);
+                    }
+                });
+            });
+
+            if (currentPiece) {
+                const ghostPos = getGhostPosition();
+                currentPiece.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            const cell = document.getElementById(`cell-${ghostPos.y + y}-${currentPiece.pos.x + x}`);
+                            if (cell) cell.classList.add('ghost');
+                        }
+                    });
+                });
+
+                currentPiece.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            const cell = document.getElementById(`cell-${currentPiece.pos.y + y}-${currentPiece.pos.x + x}`);
+                            if (cell) cell.classList.add(COLORS[currentPiece.type]);
+                        }
+                    });
+                });
+            }
+        }
+
+        function drawNext() {
+            const nextCells = nextElement.children;
+            for (let i = 0; i < 16; i++) nextCells[i].className = 'cell opacity-20 bg-slate-700';
+
+            if (nextPiece) {
+                const shape = nextPiece.shape;
+                const offsetX = Math.floor((4 - shape[0].length) / 2);
+                const offsetY = Math.floor((4 - shape.length) / 2);
+
+                shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            const idx = (y + offsetY) * 4 + (x + offsetX);
+                            nextCells[idx].className = `cell ${COLORS[nextPiece.type]}`;
+                        }
+                    });
+                });
+            }
+        }
+
+        function collide(piece, offset = { x: 0, y: 0 }) {
+            const { shape, pos } = piece;
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x] !== 0) {
+                        const newX = pos.x + x + offset.x;
+                        const newY = pos.y + y + offset.y;
+                        if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT || (newY >= 0 && board[newY][newX])) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function merge() {
+            currentPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        if (currentPiece.pos.y + y < 0) {
+                            gameOver();
+                            return;
+                        }
+                        board[currentPiece.pos.y + y][currentPiece.pos.x + x] = currentPiece.type;
+                    }
+                });
+            });
+        }
+
+        function rotate(piece) {
+            const newShape = piece.shape[0].map((_, i) => piece.shape.map(row => row[i]).reverse());
+            const oldShape = piece.shape;
+            piece.shape = newShape;
+            
+            let offset = 0;
+            while (collide(piece)) {
+                piece.pos.x += (offset > 0 ? -1 : 1);
+                offset = (offset > 0 ? (offset + 1) * -1 : (offset * -1) + 1);
+                if (offset > piece.shape[0].length) {
+                    piece.shape = oldShape;
+                    return;
+                }
+            }
+        }
+
+        function clearLines() {
+            let linesCleared = 0;
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(BOARD_WIDTH).fill(0));
+                    linesCleared++;
+                    y++; 
+                }
+            }
+            if (linesCleared > 0) {
+                const points = [0, 100, 300, 500, 800];
+                score += points[linesCleared] * level;
+                scoreElement.innerText = score.toString().padStart(6, '0');
+                
+                if (score >= level * 1000) {
+                    level++;
+                    levelElement.innerText = level;
+                    dropInterval = Math.max(100, 1000 - (level - 1) * 100);
+                }
+            }
+        }
+
+        function getGhostPosition() {
+            let ghostY = 0;
+            while (!collide(currentPiece, { x: 0, y: ghostY + 1 })) {
+                ghostY++;
+            }
+            return { x: currentPiece.pos.x, y: currentPiece.pos.y + ghostY };
+        }
+
+        function drop() {
+            if (collide(currentPiece, { x: 0, y: 1 })) {
+                merge();
+                clearLines();
+                resetPiece();
+            } else {
+                currentPiece.pos.y++;
+            }
+            dropCounter = 0;
+        }
+
+        function hardDrop() {
+            if (!gameActive || isPaused) return;
+            while (!collide(currentPiece, { x: 0, y: 1 })) {
+                currentPiece.pos.y++;
+            }
+            drop();
+            draw();
+        }
+
+        function resetPiece() {
+            const types = 'IJLOSTZ';
+            currentPiece = nextPiece || createPiece(types[Math.floor(Math.random() * types.length)]);
+            nextPiece = createPiece(types[Math.floor(Math.random() * types.length)]);
+            
+            if (collide(currentPiece)) {
+                gameOver();
+            }
+            drawNext();
+        }
+
+        function togglePause() {
+            if (!gameActive) return;
+            isPaused = !isPaused;
+            const overlay = document.getElementById('pause-overlay');
+            if (isPaused) {
+                overlay.classList.remove('hidden');
+                pauseBtn.innerText = 'RESUME';
+            } else {
+                overlay.classList.add('hidden');
+                pauseBtn.innerText = 'PAUSE';
+                lastTime = performance.now();
+                requestAnimationFrame(update);
+            }
+            pauseBtn.blur();
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('final-score').innerText = `Final Score: ${score}`;
+            gameOverModal.classList.remove('hidden');
+        }
+
+        function update(time = 0) {
+            if (!gameActive || isPaused) return;
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            dropCounter += deltaTime;
+            if (dropCounter > dropInterval) {
+                drop();
+            }
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function startGame() {
+            if (gameActive && !isPaused) {
+                location.reload();
+                return;
+            }
+            createBoard();
+            board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+            score = 0;
+            level = 1;
+            dropInterval = 1000;
+            scoreElement.innerText = '000000';
+            levelElement.innerText = '1';
+            gameActive = true;
+            isPaused = false;
+            resetPiece();
+            gameOverModal.classList.add('hidden');
+            startBtn.innerText = 'RESET';
+            startBtn.blur();
+            lastTime = performance.now();
+            requestAnimationFrame(update);
+        }
+
+        window.addEventListener('keydown', event => {
+            const gameKeys = [37, 38, 39, 40, 32];
+            const pauseKeys = ['p', 'P', 'Escape'];
+
+            if (gameKeys.includes(event.keyCode) || pauseKeys.includes(event.key)) {
+                event.preventDefault();
+            }
+
+            if (!gameActive) return;
+            if (pauseKeys.includes(event.key)) {
+                togglePause();
+                return;
+            }
+            if (isPaused) return;
+
+            switch (event.keyCode) {
+                case 37: if (!collide(currentPiece, { x: -1, y: 0 })) currentPiece.pos.x--; break;
+                case 39: if (!collide(currentPiece, { x: 1, y: 0 })) currentPiece.pos.x++; break;
+                case 40: drop(); break;
+                case 38: rotate(currentPiece); break;
+                case 32: hardDrop(); break;
+            }
+            draw();
+        });
+
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', togglePause);
+
+        const bindControl = (id, action) => {
+            const btn = document.getElementById(id);
+            let timer;
+            const start = (e) => {
+                e.preventDefault();
+                if (!gameActive || isPaused) return;
+                action();
+                draw();
+                timer = setInterval(() => { action(); draw(); }, 150);
+            };
+            const stop = () => clearInterval(timer);
+            btn.addEventListener('touchstart', start);
+            btn.addEventListener('touchend', stop);
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', stop);
+            btn.addEventListener('mouseleave', stop);
+        };
+
+        document.getElementById('ctrl-up').addEventListener('click', (e) => { 
+            e.preventDefault();
+            if(gameActive && !isPaused) { rotate(currentPiece); draw(); }
+        });
+        document.getElementById('ctrl-hard').addEventListener('click', (e) => {
+            e.preventDefault();
+            hardDrop();
+        });
+        document.getElementById('ctrl-pause').addEventListener('click', (e) => {
+            e.preventDefault();
+            togglePause();
+        });
+        
+        bindControl('ctrl-left', () => { if(gameActive && !isPaused && !collide(currentPiece, { x: -1, y: 0 })) currentPiece.pos.x--; });
+        bindControl('ctrl-right', () => { if(gameActive && !isPaused && !collide(currentPiece, { x: 1, y: 0 })) currentPiece.pos.x++; });
+        bindControl('ctrl-down', () => { if(gameActive && !isPaused) drop(); });
+
+        createBoard();
+    </script>
+</body>
+</html>
