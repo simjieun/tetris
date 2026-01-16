@@ -1,0 +1,24 @@
+# robots.txt for 뿅뿅 테트리스
+# https://simjieun.github.io/tetris/
+
+# Allow all robots to access all content
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://simjieun.github.io/tetris/sitemap.xml
+
+# Crawl delay (optional - be nice to servers)
+Crawl-delay: 1
+
+# Google specific
+User-agent: Googlebot
+Allow: /
+
+# Bing specific  
+User-agent: Bingbot
+Allow: /
+
+# Disallow admin or private areas (if any)
+# Disallow: /admin/
+# Disallow: /private/
